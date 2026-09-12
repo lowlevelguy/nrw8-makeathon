@@ -1,0 +1,12 @@
+@startuml
+participant BarCodeReader
+
+BarCodeReader -> STM32F4 : Box metadata (capacity, content type)
+activate STM32F4
+
+STM32F4 -> STM32F4 : Save box data (capacity, content count, content type, entry timestamp)
+STM32F4 -> STM32F4 : Solve and save target rail in input matrix
+
+STM32F4 -> InputRailMatrixSelector : "Go to position" command
+deactivate STM32F4
+@enduml

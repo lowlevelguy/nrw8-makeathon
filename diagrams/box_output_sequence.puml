@@ -1,0 +1,22 @@
+@startuml
+participant Dashboard
+
+activate Dashboard
+Dashboard -> STM32F4 : "Fetch N of type A" command
+activate STM32F4
+
+STM32F4 -> STM32F4 : Compute available of type A
+
+alt available >= N
+    loop N >= 0
+        STM32F4 -> STM32F4 : Pop rail matrix position from queue
+        STM32F4 -> OutputRailMatrixSelector : "Open trapdoor" command
+        activate OutputRailMatrixSelector
+        deactivate OutputRailMatrixSelector
+        STM32F4 -> STM32F4 : N -= box content count
+    end
+else
+    STM32F4 -> Dashboard : Error
+end
+
+@enduml
