@@ -25,6 +25,8 @@ enum {
 	TX_PACKET_SELECT_OUTPUT_LANE,
 	TX_PACKET_KERNELS_ACK,
 	TX_PACKET_KERNELS_NACK,
+	TX_PACKET_FETCH_COMPLETE,
+	TX_PACKET_SELECT_OUTPUT_LANE_AND_RESTOCK,
 };
 
 /**
@@ -59,6 +61,7 @@ typedef struct {
  * @brief Builds a packet given a 3-byte payload and information on whether it
  * is for TX or RX.
  *
+ * @param is_rx [in] boolean; 0 = TX packet, 1 = RX packet
  * @param is_rx [in] boolean; 0 = RX packet desired, 1 = TX packet desired
  * @param type [in] contains the application layer type
  * @param params [in] 2-byte buffer containing the application layer parameters

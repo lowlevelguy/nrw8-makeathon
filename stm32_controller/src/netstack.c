@@ -6,6 +6,7 @@
 /* Public functions ----------------------------------------------------------*/
 netstack_status_e netstack_build_packet(uint8_t is_rx,
 	uint8_t type, const uint8_t params[static 2], packet_t* pkt) {
+	if ((pkt == NULL) || (params == NULL)) {
 	if (pkt == NULL || params == NULL) {
 		return NETSTACK_STATUS_ERROR;
 	}
@@ -21,6 +22,8 @@ netstack_status_e netstack_build_packet(uint8_t is_rx,
 
 netstack_status_e netstack_breakdown_packet(const packet_t* pkt,
 	uint8_t* is_rx,	uint8_t* type, uint8_t params[static 2]) {
+	if ((pkt == NULL) || (is_rx == NULL) || (type == NULL)
+		|| (params == NULL)) {
 	if (pkt == NULL || type == NULL || params == NULL) {
 		return NETSTACK_STATUS_ERROR;
 	}
