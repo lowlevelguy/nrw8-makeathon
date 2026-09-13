@@ -25,6 +25,7 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/sysmem.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/syscalls.c
 	${CMAKE_CURRENT_SOURCE_DIR}/../../src/uart.c
+	${CMAKE_CURRENT_SOURCE_DIR}/../../src/netstack.c
 	${CMAKE_CURRENT_SOURCE_DIR}/../../src/storage.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32f407xx.s
 )

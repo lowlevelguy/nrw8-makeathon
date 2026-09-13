@@ -47,29 +47,6 @@ extern lane_t lanes[LANE_COUNT];
  */
 void storage_init(void);
 
-/**
- * @brief Allocates a free lane to a type.
- *
- * Pops the oldest free lane from the free queue and appends it to the FIFO
- * queue of @p type.
- *
- * @param type type index of the queue to append the lane to
- * @return lane index in [0, LANE_COUNT) on success, -1 on invalid type, -2 if
- * no free lanes remain
- */
-int16_t alloc_lane(uint8_t type);
-
-/**
- * @brief Releases the oldest allocated lane of a type to the free queue.
- *
- * Pops the head of the FIFO queue of @p type (the longest-allocated lane) and
- * pushes it onto the free queue.
- *
- * @param type type index of the queue to pop the lane from
- * @return 0 on success, -1 on invalid type, -2 if the queue is empty
- */
-int8_t free_lane(uint8_t type);
-
 
 #ifdef __cplusplus
 }

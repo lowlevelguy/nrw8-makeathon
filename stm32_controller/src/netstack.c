@@ -1,35 +1,34 @@
 #include <stddef.h>
 #include "netstack.h"
-
-typedef struct {
-	packet_type_e type;
-	uint8_t (*callback)(void*);
-} packet_handler_t;
-
-static uint8_t box_metadata_handler(void* payload) {
-	save_box();
-	position = solve_position();
-	uart_tx(position);
-}
-
-static uint8_t kernels_query_handler(void* payload) {
-
-}
-
-packet_handler_t handlers[] = {
-	{ PACKET_TYPE_RX_BOX_METADATA_READING, box_metadata_handler },
-	{ PACKET_TYPE_RX_KERNELS_QUERY, kernels_query_handler },
-};
+#include "uart.h"
 
 
-netstack_status_e netstack_handle(packet_t* pkt) {
-	if (pkt == NULL) {
-		return NETSTACK_STATUS_NULL_ERROR;
+/* Public functions ----------------------------------------------------------*/
+netstack_status_e netstack_build_packet(uint8_t is_rx,
+	uint8_t type, const uint8_t params[static 2], packet_t* pkt) {
+	if (pkt == NULL || params == NULL) {
+		return NETSTACK_STATUS_ERROR;
 	}
 
-	for (int i = 0; i < PACKET_TYPE_RX_COUNT; i++) {
-		if (pkt->link_header.type == handlers[i].type) {
-			return handlers[i].callback(pkt);
-		}
+	pkt->link_header.sof = NETSTACK_SOF;
+	pkt->link_header.is_rx = is_rx;
+	pkt->type = type;
+	pkt->params[0] = params[0];
+	pkt->params[1] = params[1];
+
+	return NETSTACK_STATUS_OK;
+}
+
+netstack_status_e netstack_breakdown_packet(const packet_t* pkt,
+	uint8_t* is_rx,	uint8_t* type, uint8_t params[static 2]) {
+	if (pkt == NULL || type == NULL || params == NULL) {
+		return NETSTACK_STATUS_ERROR;
 	}
+
+	*is_rx = pkt->link_header.is_rx;
+	*type = pkt->type;
+	params[0] = pkt->params[0];
+	params[1] = pkt->params[1];
+
+	return NETSTACK_STATUS_OK;
 }
