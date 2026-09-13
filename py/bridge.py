@@ -426,6 +426,8 @@ class Bridge:
             print(f"[bridge] {role} not connected, dropping {msg}")
             return
 
+        role_lower = role.lower()
+        print(f"[bridge] [{role_lower}:send] {msg}")
         line = (json.dumps(msg) + "\n").encode("utf-8")
         try:
             conn.sendall(line)
@@ -438,6 +440,7 @@ class Bridge:
     def _handle_json_from_sim(self, msg):
 
         t = msg.get("type")
+        print(f"[bridge] [sim:receive] {msg}")
 
         if t == "BOX_SCANNED":
             params = encode_barcode_reading_params(
@@ -455,6 +458,7 @@ class Bridge:
     def _handle_json_from_hud(self, msg):
 
         t = msg.get("type")
+        print(f"[bridge] [hud:receive] {msg}")
 
         if t == "ORDER_REQUEST":
             params = encode_fetch_kernels_request_params(
@@ -471,6 +475,7 @@ class Bridge:
             print(f"[bridge] STM not open, dropping outbound type={type_id}")
             return
 
+        print(f"[bridge] [stm:send] type_id={type_id}, params={params.hex()}")
         pkt = build_packet(is_rx=1, type_id=type_id, params=params)
         self._stm_tx_q.put(pkt)
 
@@ -538,6 +543,7 @@ class Bridge:
             print(f"[bridge] unexpected is_rx=1 packet from STM, dropping: {pkt!r}")
             return
 
+        print(f"[bridge] [stm:receive] type_id={type_id}, params={params.hex()}")
         route = STM_TX_ROUTES.get(type_id)
         if route is None:
             print(f"[bridge] STM sent unrouted type_id={type_id}, params={params!r}")
