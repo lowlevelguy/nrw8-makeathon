@@ -169,7 +169,9 @@ STORAGE_Y_GAP = 0.02
 LANE_GAP = 0.04
 LANE_START_X = CONVEYOR_X[0] - CONVEYOR_LENGTH / 2.0 + BOX_LENGTH / 2.0
 LANE_TIP_X = CONVEYOR_X[2] + CONVEYOR_LENGTH / 2.0 - BOX_LENGTH / 2.0
-LANE_SLOT_PITCH = BOX_LENGTH + LANE_GAP
+# Slot pitch along the lane axis (X) = box length along that same
+# axis * 1.2 (20% clearance so queued crates never overlap).
+LANE_SLOT_PITCH = BOX_LENGTH * 1.2
 LANE_CAPACITY_PER_LAYER = max(
     1,
     int((LANE_TIP_X - LANE_START_X) / LANE_SLOT_PITCH) + 1
@@ -181,7 +183,9 @@ LANE_MAX_BOXES = 10
 # from) are just two parallel horizontal rods.
 FORK_TINE_RADIUS = 0.05
 FORK_TINE_SPACING = BOX_WIDTH * 0.55
-FORK_TINE_LENGTH = BOX_LENGTH * 0.9
+# Tine length runs on the same axis (X) as the box/lane length:
+# box length * 1.2 so the fork fully supports the crate.
+FORK_TINE_LENGTH = BOX_LENGTH * 1.2
 GRIPPER_DROP = BOX_HEIGHT / 2.0 + 0.20
 
 
@@ -1677,10 +1681,11 @@ class WarehouseSimulation:
         self.scene_root.add_child(self.scanner_node)
         self.box_nodes = {}
 
-        # The very first box arrives the same way every later
-        # box does: through the wall opening.
-
-        self.spawn_box()
+        # No auto-spawned pending box here on purpose: the
+        # first box must be added manually (N / NEWBOX) after
+        # the bridge is up, so STM actually sees its BOX_SCANNED.
+        # Auto-spawning before SIM connects means STM boots
+        # ready but never learns about the already-pending box.
         self.sync_scene_graph()
 
     # --------------------------------------------------------
@@ -1741,6 +1746,11 @@ class WarehouseSimulation:
             self.bridge = None
 
     def handle_place_at(self, x, y):
+        # STM speaks full-scale coords (15x26); demo grid is
+        # LEVEL_COUNT x LINE_COUNT. Wrap so e.g. (3,0) lands on
+        # a real lane instead of stalling the box on ERR.
+        x = int(x) % LEVEL_COUNT
+        y = int(y) % LINE_COUNT
         if self.pending_place_box is None:
             for box in self.boxes:
                 if box.state == BoxState.WAITING and box.scanned:
@@ -1749,8 +1759,6 @@ class WarehouseSimulation:
         box = self.pending_place_box
         if box is None:
             return self._respond("ERR no pending box")
-        if not (0 <= x < LEVEL_COUNT and 0 <= y < LINE_COUNT):
-            return self._respond("ERR place out of range")
         if not self.lane_has_space(x, y):
             return self._respond("ERR lane full (10 max)")
         self.target_level = x
@@ -1769,8 +1777,8 @@ class WarehouseSimulation:
         return self.last_response
 
     def handle_fetch_box(self, x, y, restock):
-        if not (0 <= x < LEVEL_COUNT and 0 <= y < LINE_COUNT):
-            return self._respond("ERR fetch out of range")
+        x = int(x) % LEVEL_COUNT
+        y = int(y) % LINE_COUNT
         if self.storage[x][y] <= 0:
             return self._respond("ERR nothing stored there")
         if self.extract_state != ExtractState.IDLE:
@@ -2490,6 +2498,13 @@ class WarehouseSimulation:
             elif box.state == BoxState.SCANNING:
                 box.scan_timer += dt
                 if box.scan_timer >= SCAN_DURATION:
+                    # Only clear the gate once STM can actually be
+                    # told: if the bridge is down the BOX_SCANNED
+                    # would be dropped and STM would never answer
+                    # with PLACE_AT, leaving the box stuck. Hold
+                    # the scan until send_bridge can deliver.
+                    if self.bridge is None and not self.connect_bridge():
+                        continue
                     box.scanned = True
                     box.state = BoxState.SPAWNING
                     if self.pending_place_box is None:
@@ -2611,6 +2626,8 @@ class WarehouseSimulation:
 
     def update(self, dt):
         self.elapsed_time += dt
+        if self.bridge is None:
+            self.connect_bridge()
         self.poll_bridge()
         self.update_robot(dt)
         self.update_infeed_boxes(dt)

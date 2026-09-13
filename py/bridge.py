@@ -210,19 +210,19 @@ def register_stm_tx_route(type_id, dest_role, json_type, param_builder):
 
 register_stm_tx_route(
     TX_SELECT_INPUT_LANE, "SIM", "PLACE_AT",
-    lambda p: {"x": p[0], "y": p[1]},
+    lambda p: {"x": p[1], "y": p[0]},
 )
 
 register_stm_tx_route(
     TX_SELECT_OUTPUT_LANE, "SIM", "FETCH_BOX",
-    lambda p: {"x": p[0], "y": p[1], "restock": False},
+    lambda p: {"x": p[1], "y": p[0], "restock": False},
 )
 
 # When STM guy commits the type ID, patch the constant at the
 # top and this route lights up automatically:
 register_stm_tx_route(
     TX_SELECT_OUTPUT_LANE_AND_RESTOCK, "SIM", "FETCH_BOX",
-    lambda p: {"x": p[0], "y": p[1], "restock": True},
+    lambda p: {"x": p[1], "y": p[0], "restock": True},
 )
 
 register_stm_tx_route(
