@@ -1,10 +1,15 @@
 import json
 import time
 import random
+import sys
+import select
 from collections import defaultdict
 from bridge_client import BridgeClient
 
 SIM_SOCKET_PATH = "/tmp/warehouse_sim.sock"
+GRID_W = 3
+GRID_H = 4
+LANE_DEPTH = 10
 
 # SKU types: sku_id -> capacity (pieces per box)
 SKU_TYPES = {
@@ -27,18 +32,12 @@ class MockSim:
 
     def __init__(self):
         self.bridge = BridgeClient(SIM_SOCKET_PATH)
-        self.pending_box = None  # Guard: one box awaiting PLACE_AT
-        self.lanes = defaultdict(list)  # (x, y) -> [box, box, box...]
+        self.pending_box = None
+        self.lanes = defaultdict(list)
         self.running = True
         self.box_id = 0
-        
-        # Spawning control
-        self.last_spawn = time.time()
-        self.spawn_interval = 1.5  # Spawn every 1.5 seconds
-        
-        # Auto-advance control
         self.last_advance = time.time()
-        self.advance_interval = 0.5  # Try advance every 500ms
+        self.advance_interval = 0.5
 
     def spawn_box(self, sku: int, quantity: int):
         """Simulate a new box entering the scanner."""
@@ -52,22 +51,25 @@ class MockSim:
         self.pending_box = {"id": self.box_id, "sku": sku, "qty": quantity}
 
     def handle_place_at(self, x: int, y: int):
-        """STM tells us where to push the pending box."""
         if self.pending_box is None:
             print("[SIM] ERROR: PLACE_AT with no pending box!")
             return
-
+        if not (0 <= x < GRID_W and 0 <= y < GRID_H):
+            print(f"[SIM] ERROR: PLACE_AT out of range ({x}, {y}), valid 0-{GRID_W-1},0-{GRID_H-1}, keeping pending box")
+            return
         lane = self.lanes[(x, y)]
-        assert len(lane) < 10, f"Lane ({x}, {y}) is full! (depth={len(lane)})"
-
-        print(f"[SIM] Placing box #{self.pending_box['id']} at ({x}, {y}), depth={len(lane)+1}/10")
+        if len(lane) >= LANE_DEPTH:
+            print(f"[SIM] ERROR: Lane ({x}, {y}) full ({len(lane)}/{LANE_DEPTH}), keeping pending box")
+            return
+        print(f"[SIM] Placing box #{self.pending_box['id']} at ({x}, {y}), depth={len(lane)+1}/{LANE_DEPTH}")
         lane.append(self.pending_box)
         self.pending_box = None
 
     def handle_fetch_box(self, x: int, y: int, restock: bool):
-        """STM tells us to pop from lane start and either exit or restock."""
+        if not (0 <= x < GRID_W and 0 <= y < GRID_H):
+            print(f"[SIM] ERROR: FETCH_BOX out of range ({x}, {y})!")
+            return
         lane = self.lanes[(x, y)]
-        
         if not lane:
             print(f"[SIM] ERROR: Fetching from empty lane ({x}, {y})!")
             return
@@ -96,14 +98,28 @@ class MockSim:
         if non_empty:
             print(f"[SIM] Lane state: {non_empty}")
 
-    def try_spawn(self):
-        """Spawn a box if enough time has passed."""
-        now = time.time()
-        if now - self.last_spawn >= self.spawn_interval and self.pending_box is None:
+    def manual_add_box(self, sku=None, quantity=None):
+        if self.pending_box is not None:
+            print("[SIM] Input buffer occupied, waiting for PLACE_AT")
+            return False
+        if sku is None:
             sku = random.choice(list(SKU_TYPES.keys()))
-            qty = SKU_TYPES[sku]
-            self.spawn_box(sku, qty)
-            self.last_spawn = now
+        if quantity is None:
+            quantity = SKU_TYPES[sku]
+        self.spawn_box(sku, quantity)
+        return True
+
+    def poll_manual_button(self):
+        try:
+            r, _, _ = select.select([sys.stdin], [], [], 0)
+        except Exception:
+            return
+        if r:
+            line = sys.stdin.readline()
+            if line is not None:
+                cmd = line.strip().upper()
+                if cmd in ("", "N", "NEW", "NEWBOX", "ADD"):
+                    self.manual_add_box()
 
     def try_advance(self):
         """Try autonomous lane advancement."""
@@ -127,14 +143,12 @@ class MockSim:
                 print(f"[SIM] Unknown message type: {msg_type}")
 
     def run(self):
-        """Main loop: spawn boxes, advance lanes, process messages."""
-        print("[SIM] Connected to Bridge (26×15 lanes)")
-        
+        print("[SIM] Connected to Bridge (3x4 lanes, 10 deep). Press ENTER for manual box feed.")
         try:
             while self.running:
-                self.try_spawn()      # Spawn periodically
-                self.try_advance()    # Auto-advance lanes
-                self.poll()           # Handle STM commands
+                self.poll_manual_button()
+                self.try_advance()
+                self.poll()
                 time.sleep(0.05)
         except KeyboardInterrupt:
             print("[SIM] Shutting down")
